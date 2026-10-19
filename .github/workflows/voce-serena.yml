@@ -1,0 +1,45 @@
+# Scarica la voce italiana «Serena» (Piper, licenza CC BY 4.0, autore: committa) da Hugging Face
+# e la salva nel sito divisa in parti da 23 MB. Parte da sola quando questo file cambia,
+# oppure a mano da Actions › «Scarica la voce Serena» › Run workflow.
+name: Scarica la voce Serena
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/voce-serena.yml']
+permissions:
+  contents: write
+jobs:
+  scarica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scarica e dividi il modello
+        run: |
+          set -euo pipefail
+          for q in medium high; do
+            n="it_IT-serena-$q"; d="tts/piper/$n"
+            rm -rf "$d"; mkdir -p "$d"
+            curl -fsSL --retry 3 -o "/tmp/$n.onnx" "https://huggingface.co/committa/$n/resolve/main/$n.onnx"
+            curl -fsSL --retry 3 -o "$d/config.json" "https://huggingface.co/committa/$n/resolve/main/$n.onnx.json"
+            curl -fsSL --retry 3 -o "$d/README.md" "https://huggingface.co/committa/$n/resolve/main/README.md" || true
+            split -b 23000000 -d -a 1 "/tmp/$n.onnx" "$d/model.part"
+            python3 - "$d" "/tmp/$n.onnx" <<'PY'
+          import json, os, sys, hashlib
+          d, f = sys.argv[1], sys.argv[2]
+          parts = sorted(p for p in os.listdir(d) if p.startswith("model.part"))
+          b = open(f, "rb").read()
+          json.dump({"parts": parts, "size": len(b), "sha1": hashlib.sha1(b).hexdigest()[:12]}, open(os.path.join(d, "manifest.json"), "w"))
+          print(d, parts, len(b))
+          PY
+          done
+          ls -laR tts/piper
+      - name: Salva nel repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tts/piper
+          git diff --cached --quiet && exit 0
+          git commit -m "Voce Serena (Piper, CC BY 4.0) da Hugging Face"
+          git pull --rebase origin main
+          git push origin HEAD:main
