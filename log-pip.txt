@@ -1,0 +1,11 @@
+coqui-tts               0.24.3
+coqui-tts-trainer       0.1.7
+onnx                    1.23.2
+onnx-ir                 1.0.0
+onnxruntime             1.31.0
+onnxscript              0.7.2
+optimum                 1.23.3
+torch                   2.5.1+cpu
+torchaudio              2.5.1+cpu
+torchvision             0.20.1+cpu
+transformers            4.46.3

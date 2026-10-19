@@ -1,0 +1,25 @@
+out:
+total 68
+drwxr-xr-x 4 runner runner  4096 Oct 19 09:16 .
+drwxr-xr-x 3 runner runner  4096 Oct 19 09:13 ..
+drwxr-xr-x 2 runner runner  4096 Oct 19 09:15 coqui-mai_female
+drwxr-xr-x 2 runner runner  4096 Oct 19 09:16 coqui-mai_male
+-rw-r--r-- 1 runner runner 47115 Oct 19 09:16 log-coqui.txt
+-rw-r--r-- 1 runner runner     0 Oct 19 09:16 log-files.txt
+-rw-r--r-- 1 runner runner   348 Oct 19 09:15 log-pip.txt
+
+out/coqui-mai_female:
+total 149024
+drwxr-xr-x 2 runner runner      4096 Oct 19 09:15 .
+drwxr-xr-x 4 runner runner      4096 Oct 19 09:16 ..
+-rw-r--r-- 1 runner runner      2830 Oct 19 09:15 config.json
+-rw-r--r-- 1 runner runner 114247580 Oct 19 09:15 fp32.onnx
+-rw-r--r-- 1 runner runner  38335750 Oct 19 09:15 int8.onnx
+
+out/coqui-mai_male:
+total 149024
+drwxr-xr-x 2 runner runner      4096 Oct 19 09:16 .
+drwxr-xr-x 4 runner runner      4096 Oct 19 09:16 ..
+-rw-r--r-- 1 runner runner      2830 Oct 19 09:16 config.json
+-rw-r--r-- 1 runner runner 114247580 Oct 19 09:15 fp32.onnx
+-rw-r--r-- 1 runner runner  38335734 Oct 19 09:16 int8.onnx
