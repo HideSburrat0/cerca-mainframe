@@ -1,0 +1,100 @@
+# Converte in ONNX altre voci italiane open source, per farle girare nel browser:
+#  - Coqui VITS «mai_female» (Lisa Caputo) e «mai_male» (Riccardo Fasa), dataset M-AILABS
+#  - Meta MMS-TTS italiano (facebook/mms-tts-ita, licenza CC BY-NC 4.0)
+# Il risultato va nel ramo «voci-convertite»: da lì si scelgono le versioni da pubblicare.
+name: Converti voci open source
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/converti-voci.yml']
+permissions:
+  contents: write
+jobs:
+  converti:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Installa gli strumenti
+        run: |
+          pip install --quiet torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet coqui-tts "transformers<4.50" onnx onnxruntime optimum[exporters] soundfile
+          pip list 2>/dev/null | grep -i -E "^(torch|coqui|transformers|onnx|onnxruntime|optimum) " || true
+      - name: Coqui VITS italiano
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          for n in mai_female mai_male; do
+            curl -fsSL -o /tmp/$n.zip "https://github.com/coqui-ai/TTS/releases/download/v0.6.1_models/tts_models--it--$n--vits.zip"
+            unzip -q -o /tmp/$n.zip -d /tmp/$n
+          done
+          cat > /tmp/coqui.py <<'PY'
+          import json, os, sys, glob, numpy as np
+          from TTS.tts.configs.vits_config import VitsConfig
+          from TTS.tts.models.vits import Vits
+          from onnxruntime.quantization import quantize_dynamic, QuantType
+          import onnxruntime as ort
+          for n in ["mai_female", "mai_male"]:
+              d = glob.glob(f"/tmp/{n}/*")[0]
+              cfg = VitsConfig(); cfg.load_json(os.path.join(d, "config.json"))
+              m = Vits.init_from_config(cfg); m.load_checkpoint(cfg, os.path.join(d, "model_file.pth"), eval=True)
+              o = f"out/coqui-{n}"; os.makedirs(o, exist_ok=True)
+              m.export_onnx(output_path=f"{o}/fp32.onnx", verbose=False)
+              quantize_dynamic(f"{o}/fp32.onnx", f"{o}/int8.onnx", weight_type=QuantType.QUInt8)
+              ch = m.tokenizer.characters
+              idmap = {c: [ch.char_to_id(c)] for c in ch.vocab if c not in ("<BLNK>",)}
+              blank = ch.char_to_id(ch.blank) if getattr(ch, "blank", None) else 0
+              test = "ciao, come stai? il job entra nello spool."
+              ids = m.tokenizer.text_to_ids(test)
+              sess = ort.InferenceSession(f"{o}/fp32.onnx")
+              print(n, [(i.name, i.shape) for i in sess.get_inputs()], [(x.name, x.shape) for x in sess.get_outputs()])
+              conf = {"audio": {"sample_rate": cfg.audio.sample_rate}, "phoneme_type": "text", "text": {"lowercase": True, "ascii": True},
+                      "phoneme_id_map": {**idmap, "^": [], "$": [], "_": [blank]}, "inference": {"noise_scale": 0.667, "length_scale": 1, "noise_w": 0.8},
+                      "test": {"text": test, "ids": ids}, "inputs": [i.name for i in sess.get_inputs()], "vocab": ch.vocab, "blank": blank}
+              json.dump(conf, open(f"{o}/config.json", "w"), ensure_ascii=False, indent=1)
+              print(n, "blank", blank, "test ids", ids[:20])
+          PY
+          python /tmp/coqui.py
+          ls -laR out
+      - name: MMS-TTS italiano
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p out/mms-ita
+          optimum-cli export onnx --model facebook/mms-tts-ita --task text-to-audio /tmp/mms
+          ls -la /tmp/mms
+          cat > /tmp/mms.py <<'PY'
+          import json, shutil, glob
+          from onnxruntime.quantization import quantize_dynamic, QuantType
+          import onnxruntime as ort
+          from transformers import AutoTokenizer
+          src = glob.glob("/tmp/mms/*.onnx")[0]
+          shutil.copy(src, "out/mms-ita/fp32.onnx")
+          quantize_dynamic("out/mms-ita/fp32.onnx", "out/mms-ita/int8.onnx", weight_type=QuantType.QUInt8)
+          tok = AutoTokenizer.from_pretrained("facebook/mms-tts-ita")
+          test = "ciao, come stai? il job entra nello spool."
+          ids = tok(test).input_ids
+          sess = ort.InferenceSession("out/mms-ita/fp32.onnx")
+          vocab = tok.get_vocab()
+          for f in ("config.json", "tokenizer_config.json", "vocab.json", "special_tokens_map.json"):
+              for p in glob.glob("/tmp/mms/" + f): shutil.copy(p, "out/mms-ita/orig_" + f)
+          json.dump({"test": {"text": test, "ids": ids}, "vocab": vocab, "inputs": [i.name for i in sess.get_inputs()], "outputs": [o.name for o in sess.get_outputs()],
+                     "add_blank": getattr(tok, "add_blank", None), "pad_token_id": tok.pad_token_id, "normalize": getattr(tok, "normalize", None)},
+                    open("out/mms-ita/info.json", "w"), ensure_ascii=False, indent=1)
+          print([(i.name, i.shape) for i in sess.get_inputs()], ids)
+          PY
+          python /tmp/mms.py
+      - name: Salva nel ramo voci-convertite
+        run: |
+          set -e
+          ls -laR out || true
+          cd out
+          git init -q -b voci-convertite
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in $(find . -name "*.onnx" -size +90M); do split -b 45000000 -d -a 1 "$f" "$f.part" && rm "$f"; done
+          git add -A
+          git commit -q -m "Voci convertite in ONNX ($GITHUB_SHA)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" voci-convertite
