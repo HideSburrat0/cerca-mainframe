@@ -19,8 +19,8 @@ jobs:
       - name: Installa gli strumenti
         run: |
           mkdir -p out
-          pip install --quiet torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet coqui-tts "transformers<4.50" onnx onnxruntime optimum[exporters] soundfile
+          pip install --quiet torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet "coqui-tts<0.27" "transformers==4.46.3" "optimum[exporters]==1.23.3" onnx onnxscript onnxruntime soundfile "torch==2.5.1" "torchaudio==2.5.1" --extra-index-url https://download.pytorch.org/whl/cpu
           pip list 2>/dev/null | grep -i -E "^(torch|coqui|transformers|onnx|onnxruntime|optimum)" | tee out/log-pip.txt || true
       - name: Coqui VITS italiano
         continue-on-error: true
