@@ -7,7 +7,7 @@ Ricerca e ascolto della guida al mainframe IBM z/OS (256 pagine), del documento 
 ## Cosa fa
 
 - **Ricerca**: scrivi una parola chiave o una domanda e ti porta al passaggio giusto, con le parole evidenziate.
-- **Ascolta**: legge ad alta voce qualsiasi sezione, con la voce neurale Kokoro che gira direttamente nel browser (niente server, niente abbonamenti).
+- **Ascolta**: legge ad alta voce qualsiasi sezione con voci neurali italiane (Kokoro e Piper) che girano direttamente nel browser: niente server, niente abbonamenti.
 - **Impostazioni › Voce**:
   - scegli tra otto voci italiane (vedi la tabella sotto), oppure una delle voci Kokoro straniere che leggono in italiano con il loro accento;
   - mescola Sara o Nicola con un'altra voce Kokoro per creare un timbro nuovo;
