@@ -9,7 +9,7 @@ Ricerca e ascolto della guida al mainframe IBM z/OS (256 pagine), del documento 
 - **Ricerca**: scrivi una parola chiave o una domanda e ti porta al passaggio giusto, con le parole evidenziate.
 - **Ascolta**: legge ad alta voce qualsiasi sezione con voci neurali italiane (Kokoro e Piper) che girano direttamente nel browser: niente server, niente abbonamenti.
 - **Impostazioni › Voce**:
-  - scegli tra otto voci italiane (vedi la tabella sotto), oppure una delle voci Kokoro straniere che leggono in italiano con il loro accento;
+  - scegli tra dieci voci italiane (vedi la tabella sotto), oppure una delle voci Kokoro straniere che leggono in italiano con il loro accento;
   - mescola Sara o Nicola con un'altra voce Kokoro per creare un timbro nuovo;
   - regola velocità, tono e la durata delle pause a virgola, due punti e punto;
   - decidi come vengono lette sigle e parole inglesi (per esempio JCL → «gei ci elle», job → «giòb»).
@@ -24,6 +24,7 @@ Ogni voce si scarica la prima volta che la usi (da 20 a 110 MB). Da quel momento
 | Serena, Serena HD | Piper | di [committa](https://huggingface.co/committa/it_IT-serena-medium), addestrata su una voce sintetica Qwen3-TTS | CC BY 4.0 |
 | Paola | Piper | [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices), dataset di Paola Persico | vedi dataset |
 | Riccardo | Piper | rhasspy/piper-voices, dataset M-AILABS; la più leggera | vedi dataset |
+| Lisa, Riccardo HD | Coqui VITS | [model zoo di Coqui TTS](https://github.com/coqui-ai/TTS), dataset M-AILABS (audiolibri); 16 kHz, convertite in ONNX dal workflow `converti-voci.yml` | vedi Coqui TTS / M-AILABS |
 | Miro, Dii | Piper | di [OpenVoiceOS](https://huggingface.co/OpenVoiceOS/pipertts_it-IT_miro), dati sintetici | CC BY-NC-SA 4.0 (solo uso non commerciale) |
 
 Le voci Piper sono copiate dalle release di [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models). Serena viene da Hugging Face, tramite il workflow `.github/workflows/voce-serena.yml`. Ogni cartella in `tts/piper/` contiene il model card originale.

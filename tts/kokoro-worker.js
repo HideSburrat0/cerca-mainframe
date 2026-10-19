@@ -122,19 +122,55 @@ async function synthKokoro(ph, sty, speed){
   return new Float32Array(a.data);
 }
 
+// --- voci che leggono lettere invece di fonemi (Coqui VITS, MMS): testo semplificato e numeri in parole
+const UNITA = ['zero', 'uno', 'due', 'tre', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci', 'undici', 'dodici', 'tredici', 'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove'];
+const DECINE = ['', '', 'venti', 'trenta', 'quaranta', 'cinquanta', 'sessanta', 'settanta', 'ottanta', 'novanta'];
+function num(n){
+  if (n < 20) return UNITA[n];
+  if (n < 100){ let d = DECINE[Math.floor(n / 10)], u = n % 10; if (u === 1 || u === 8) d = d.slice(0, -1); return d + (u ? UNITA[u] : ''); }
+  if (n < 1000){ const c = Math.floor(n / 100), r = n % 100; let h = (c > 1 ? UNITA[c] : '') + 'cento'; if (r && Math.floor(r / 10) === 8) h = h.slice(0, -1); return h + (r ? num(r) : ''); }
+  if (n < 1e6){ const k = Math.floor(n / 1000), r = n % 1000; return (k > 1 ? num(k) + 'mila' : 'mille') + (r ? num(r) : ''); }
+  if (n < 1e9){ const m = Math.floor(n / 1e6), r = n % 1e6; return (m > 1 ? num(m) + ' milioni' : 'un milione') + (r ? ' ' + num(r) : ''); }
+  return String(n).split('').map(c => UNITA[+c]).join(' ');
+}
+function numbersToWords(s){
+  return s.replace(/\d+(?:[.,]\d+)?/g, t => {
+    const m = t.match(/^(\d+)[.,](\d+)$/);
+    if (m){ if (t.includes('.') && m[2].length === 3) return num(+(m[1] + m[2])); return num(+m[1]) + ' virgola ' + (m[2].length > 2 ? m[2].split('').map(c => UNITA[+c]).join(' ') : num(+m[2])); }
+    return t.length > 9 || (t.length > 1 && t[0] === '0') ? t.split('').map(c => UNITA[+c]).join(' ') : num(+t);
+  });
+}
+const IPA2IT = [[/[ˈˌː]/g, ''], [/tʃ/g, 'ci'], [/dʒ/g, 'gi'], [/ʃ/g, 'sci'], [/ts/g, 'z'], [/dz/g, 'z'], [/[ɛeə]/g, 'e'], [/[ɔo]/g, 'o'], [/[ɾɹ]/g, 'r'], [/ʎ/g, 'gli'], [/ɲ/g, 'gn'], [/ŋ/g, 'n'], [/[ʊ]/g, 'u'], [/[ɪ]/g, 'i'], [/[æɜʌɐ]/g, 'a'], [/j/g, 'i'], [/w/g, 'u'], [/ɡ/g, 'g']];
+function ipaToText(s){ for (const [re, r] of IPA2IT) s = s.replace(re, r); return s; }
+function toText(segs, map){
+  let s = segs.map(g => g.t === 'ipa' ? ipaToText(g.s) : g.s).join(' ').toLowerCase();
+  s = numbersToWords(s);
+  let out = '';
+  for (const ch of s){
+    if (map[ch]){ out += ch; continue; }
+    const base = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    out += map[base] ? base : ' ';
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+
 async function synthPiper(ph, v, speed){
   const map = v.cfg.phoneme_id_map, inf = v.cfg.inference || {};
   const pad = map['_'] || [0], ids = [...(map['^'] || [1]), ...pad];
-  for (const ch of ph.normalize('NFD')){ const id = map[ch]; if (id){ ids.push(...id, ...pad); } }
+  for (const ch of (v.cfg.phoneme_type === 'text' ? ph : ph.normalize('NFD'))){ const id = map[ch]; if (id){ ids.push(...id, ...pad); } }
   ids.push(...(map['$'] || [2]));
   if (ids.length <= 3) return new Float32Array(0);
-  const scales = new Float32Array([inf.noise_scale ?? 0.667, (inf.length_scale ?? 1) / speed, inf.noise_w ?? 0.8]);
-  const out = await v.session.run({
-    input: new ort.Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]),
-    input_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(ids.length)]), [1]),
-    scales: new ort.Tensor('float32', scales, [3])
-  });
-  const a = out.output || out[Object.keys(out)[0]];
+  const T = (a, d) => new ort.Tensor('int64', BigInt64Array.from(a.map(BigInt)), d);
+  let feeds;
+  if (v.session.inputNames.includes('input_ids')){
+    feeds = { input_ids: T(ids, [1, ids.length]) };
+    if (v.session.inputNames.includes('attention_mask')) feeds.attention_mask = T(ids.map(() => 1), [1, ids.length]);
+  } else {
+    const scales = new Float32Array([inf.noise_scale ?? 0.667, (inf.length_scale ?? 1) / speed, inf.noise_w ?? 0.8]);
+    feeds = { input: T(ids, [1, ids.length]), input_lengths: T([ids.length], [1]), scales: new ort.Tensor('float32', scales, [3]) };
+  }
+  const out = await v.session.run(feeds);
+  const a = out.output || out.waveform || out[Object.keys(out)[0]];
   return new Float32Array(a.data);
 }
 
@@ -145,12 +181,14 @@ async function pump(){
       const job = queue.shift();
       if (job.gen < gen) continue;
       const v = job.voice || {};
-      let synth, sr;
+      let synth, sr, textMap = null, fixedRate = false;
       try {
         if (v.engine === 'piper'){
           const pv = await ensurePiper(v.id, v.label);
           sr = (pv.cfg.audio && pv.cfg.audio.sample_rate) || 22050;
           synth = ph => synthPiper(ph, pv, job.speed);
+          if (pv.cfg.phoneme_type === 'text') textMap = pv.cfg.phoneme_id_map;
+          fixedRate = pv.session.inputNames.includes('input_ids');
         } else {
           await ensureKokoro();
           const sty = await style(v);
@@ -165,10 +203,10 @@ async function pump(){
         if (job.gen < gen) break;
         const c = job.clauses[k];
         const t0 = performance.now();
-        const ph = phonemize(c.segs) + (c.mark || '');
+        const ph = (textMap ? toText(c.segs, textMap) : phonemize(c.segs)) + (c.mark || '');
         const pcm = c.segs.length ? await synth(ph) : new Float32Array(0);
         if (job.gen < gen) break;
-        post({ type: 'audio', id: job.id, k, last: k === job.clauses.length - 1, pcm, sr, pause: c.pause || 0, ph: job.debug ? ph : undefined, ms: Math.round(performance.now() - t0) }, [pcm.buffer]);
+        post({ type: 'audio', id: job.id, k, last: k === job.clauses.length - 1, pcm, sr, fixedRate, pause: c.pause || 0, ph: job.debug ? ph : undefined, ms: Math.round(performance.now() - t0) }, [pcm.buffer]);
       }
     }
   } catch (e) {

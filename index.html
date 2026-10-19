@@ -1673,7 +1673,9 @@ const MAINV = [
   { id: 'piper:it_IT-paola-medium', name: 'Paola', d: 'donna', tag: 'Piper · veloce', mb: 60 },
   { id: 'piper:it_IT-dii-high', name: 'Dii', d: 'donna', tag: 'Piper · alta qualità', mb: 60 },
   { id: 'piper:it_IT-miro-high', name: 'Miro', d: 'uomo', tag: 'Piper · alta qualità', mb: 60 },
-  { id: 'piper:it_IT-riccardo-x_low', name: 'Riccardo', d: 'uomo', tag: 'Piper · leggerissima', mb: 20 }
+  { id: 'piper:it_IT-riccardo-x_low', name: 'Riccardo', d: 'uomo', tag: 'Piper · leggerissima', mb: 20 },
+  { id: 'piper:coqui-it-lisa', name: 'Lisa', d: 'donna', tag: 'Coqui VITS · voce da audiolibro', mb: 109 },
+  { id: 'piper:coqui-it-riccardo', name: 'Riccardo HD', d: 'uomo', tag: 'Coqui VITS · voce da audiolibro', mb: 109 }
 ];
 const isPiper = v => String(v || '').startsWith('piper:');
 const kvName = id => { const m = MAINV.find(x => x.id === id); if (m) return m.name; const v = KVOICES.find(x => x[0] === id); return v ? v[1] : id; };
@@ -1841,7 +1843,7 @@ function kvMsg(m){
   if (m.type === 'audio'){
     const job = KV.jobs.get(m.id); if (!job || job.gen !== KV.gen) return;
     const sr = m.sr || KSR;
-    job.chunks[m.k] = { pcm: m.pcm, pause: m.pause, sr }; job.got = (job.got || 0) + 1;
+    job.chunks[m.k] = { pcm: m.pcm, pause: m.pause, sr, fixedRate: !!m.fixedRate }; job.got = (job.got || 0) + 1;
     if (m.pcm.length > sr * 0.3){ KV.synS += m.pcm.length / sr; KV.synMs += m.ms || 0; if (KV.synS > 40){ KV.synS /= 2; KV.synMs /= 2; } KV.rtf = KV.synMs / 1000 / KV.synS; }
     kvPlay(); if (KV.synS > 3) kvStatus(); return;
   }
@@ -1913,7 +1915,8 @@ function kvPlay(){
   kvWait(false);
   const ctx = kvCtx(); if (!ctx){ kvFatal('audio non disponibile'); return; }
   if (!job.started){ job.started = true; if (job.u.onstart) job.u.onstart(); if (job.gen !== KV.gen) return; }
-  const p = Number(kset.pitch) || 1;
+  // le voci che non regolano la velocità da sole la ottengono accelerando la riproduzione
+  const p = (Number(kset.pitch) || 1) * (c.fixedRate ? (Number(kset.speed) || 1) : 1);
   const sr = c.sr || KSR;
   const pcm = c.pcm.length ? kTrim(c.pcm, sr) : new Float32Array(0);
   const pad = Math.round(sr * (c.pause || 0) * p);
