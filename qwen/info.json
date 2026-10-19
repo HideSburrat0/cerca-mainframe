@@ -1,0 +1,21 @@
+{
+ "modello": "qwen",
+ "voci": {
+  "qwen-sara": {
+   "secondi_audio": 23.52,
+   "secondi_calcolo": 141.7,
+   "rtf": 6.03
+  },
+  "qwen-nicola": {
+   "secondi_audio": 24.88,
+   "secondi_calcolo": 134.0,
+   "rtf": 5.38
+  },
+  "qwen-serena": {
+   "secondi_audio": 19.68,
+   "secondi_calcolo": 105.1,
+   "rtf": 5.34
+  }
+ },
+ "caricamento": 15.8
+}

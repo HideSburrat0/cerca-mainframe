@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/runner/work/cerca-mainframe/cerca-mainframe/tools/prova_voci.py", line 43, in <module>
+    from TTS.api import TTS
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/TTS/__init__.py", line 35, in <module>
+    from TTS.tts.configs.xtts_config import XttsConfig
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/TTS/tts/configs/xtts_config.py", line 4, in <module>
+    from TTS.tts.models.xtts import XttsArgs, XttsAudioConfig
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/TTS/tts/models/xtts.py", line 15, in <module>
+    from TTS.tts.layers.xtts.gpt import GPT
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/TTS/tts/layers/xtts/gpt.py", line 10, in <module>
+    from TTS.tts.layers.tortoise.autoregressive import (
+  File "/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/TTS/tts/layers/tortoise/autoregressive.py", line 12, in <module>
+    from transformers.pytorch_utils import isin_mps_friendly as isin
+ImportError: cannot import name 'isin_mps_friendly' from 'transformers.pytorch_utils' (/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/transformers/pytorch_utils.py)

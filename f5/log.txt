@@ -1,0 +1,44 @@
+/opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Download Vocos from huggingface charactr/vocos-mel-24khz
+
+vocab :  /home/runner/.cache/huggingface/hub/models--alien79--F5-TTS-italian/snapshots/6582a16ac03894f0ddae21e3e9b013ef5e33577e/vocab.txt
+token :  custom
+model :  /home/runner/.cache/huggingface/hub/models--alien79--F5-TTS-italian/snapshots/6582a16ac03894f0ddae21e3e9b013ef5e33577e/model_159600.safetensors 
+
+Converting audio...
+Using custom reference text...
+
+ref_text   Buongiorno a tutti. Oggi parliamo di come funziona un sistema informatico molto grande, e di come lo si gestisce ogni giorno, con calma e precisione. 
+gen_text 0 Quando faccio sabmìt, il giòb entra in gès due, che gli assegna un giòb ai di e lo scrive sullo spùl. Poi il convèrter controlla la sintassi del gei ci elle:
+gen_text 1 se trova un errore, il giòb finisce con gei ci elle èrror, senza partire. Se lo stèp va in esse zero ci sette,
+gen_text 2 apro esse di esse effe e controllo con erre a ci effe chi può usare il dàta set.
+
+
+Generating audio in 3 batches...
+  0%|          | 0/3 [00:00<?, ?it/s] 33%|███▎      | 1/3 [18:41<37:23, 1121.71s/it]100%|██████████| 3/3 [18:41<00:00, 373.90s/it] 
+f5-sara {'secondi_audio': 24.36, 'secondi_calcolo': 1122.4, 'rtf': 46.07}
+Converting audio...
+Audio is over 12s, clipping short. (2)
+Using custom reference text...
+
+ref_text   Buongiorno a tutti. Oggi parliamo di come funziona un sistema informatico molto grande, e di come lo si gestisce ogni giorno, con calma e precisione. 
+gen_text 0 Quando faccio sabmìt, il giòb entra in gès due, che gli assegna un giòb ai di e lo scrive sullo spùl. Poi il convèrter controlla la sintassi del gei ci elle: se trova un errore,
+gen_text 1 il giòb finisce con gei ci elle èrror, senza partire. Se lo stèp va in esse zero ci sette, apro esse di esse effe e controllo con erre a ci effe chi può usare il dàta set.
+
+
+Generating audio in 2 batches...
+  0%|          | 0/2 [00:00<?, ?it/s] 50%|█████     | 1/2 [13:57<13:57, 837.56s/it]100%|██████████| 2/2 [13:57<00:00, 418.78s/it]
+f5-nicola {'secondi_audio': 22.06, 'secondi_calcolo': 837.6, 'rtf': 37.97}
+Converting audio...
+Using custom reference text...
+
+ref_text   Buongiorno a tutti. Oggi parliamo di come funziona un sistema informatico molto grande, e di come lo si gestisce ogni giorno, con calma e precisione. 
+gen_text 0 Quando faccio sabmìt, il giòb entra in gès due, che gli assegna un giòb ai di e lo scrive sullo spùl. Poi il convèrter controlla la sintassi del gei ci elle: se trova un errore, il giòb finisce con gei ci elle èrror, senza partire.
+gen_text 1 Se lo stèp va in esse zero ci sette, apro esse di esse effe e controllo con erre a ci effe chi può usare il dàta set.
+
+
+Generating audio in 2 batches...
+  0%|          | 0/2 [00:00<?, ?it/s] 50%|█████     | 1/2 [11:53<11:53, 713.24s/it]100%|██████████| 2/2 [11:53<00:00, 356.62s/it]
+f5-serena {'secondi_audio': 18.98, 'secondi_calcolo': 713.3, 'rtf': 37.59}

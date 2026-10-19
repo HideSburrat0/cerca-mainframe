@@ -1,0 +1,13 @@
+[0;93m2026-10-19 10:01:16.593476984 [W:onnxruntime:Default, device_discovery.cc:95 GetPciBusId] Skipping pci_bus_id for PCI path at "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/MSFT1000:00/5620e0c7-8062-4dce-aeb7-520c7ef76171" because filename "5620e0c7-8062-4dce-aeb7-520c7ef76171" did not match expected pattern of [0-9a-f]+:[0-9a-f]+:[0-9a-f]+[.][0-9a-f]+[m
+
+********
+Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.
+********
+ 
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:00<00:00,  9.68it/s]Fetching 4 files: 100%|██████████| 4/4 [00:01<00:00,  2.11it/s]Fetching 4 files: 100%|██████████| 4/4 [00:01<00:00,  2.11it/s]
+Setting `pad_token_id` to `eos_token_id`:2150 for open-end generation.
+qwen-sara {'secondi_audio': 23.52, 'secondi_calcolo': 141.7, 'rtf': 6.03}
+Setting `pad_token_id` to `eos_token_id`:2150 for open-end generation.
+qwen-nicola {'secondi_audio': 24.88, 'secondi_calcolo': 134.0, 'rtf': 5.38}
+Setting `pad_token_id` to `eos_token_id`:2150 for open-end generation.
+qwen-serena {'secondi_audio': 19.68, 'secondi_calcolo': 105.1, 'rtf': 5.34}

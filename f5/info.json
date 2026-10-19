@@ -1,0 +1,21 @@
+{
+ "modello": "f5",
+ "voci": {
+  "f5-sara": {
+   "secondi_audio": 24.36,
+   "secondi_calcolo": 1122.4,
+   "rtf": 46.07
+  },
+  "f5-nicola": {
+   "secondi_audio": 22.06,
+   "secondi_calcolo": 837.6,
+   "rtf": 37.97
+  },
+  "f5-serena": {
+   "secondi_audio": 18.98,
+   "secondi_calcolo": 713.3,
+   "rtf": 37.59
+  }
+ },
+ "caricamento": 16.5
+}
