@@ -18,14 +18,14 @@ jobs:
         with: { python-version: '3.11' }
       - name: Installa gli strumenti
         run: |
+          mkdir -p out
           pip install --quiet torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install --quiet coqui-tts "transformers<4.50" onnx onnxruntime optimum[exporters] soundfile
-          pip list 2>/dev/null | grep -i -E "^(torch|coqui|transformers|onnx|onnxruntime|optimum) " || true
+          pip list 2>/dev/null | grep -i -E "^(torch|coqui|transformers|onnx|onnxruntime|optimum)" | tee out/log-pip.txt || true
       - name: Coqui VITS italiano
         continue-on-error: true
         run: |
           set -euo pipefail
-          mkdir -p out
           for n in mai_female mai_male; do
             curl -fsSL -o /tmp/$n.zip "https://github.com/coqui-ai/TTS/releases/download/v0.6.1_models/tts_models--it--$n--vits.zip"
             unzip -q -o /tmp/$n.zip -d /tmp/$n
@@ -56,14 +56,14 @@ jobs:
               json.dump(conf, open(f"{o}/config.json", "w"), ensure_ascii=False, indent=1)
               print(n, "blank", blank, "test ids", ids[:20])
           PY
-          python /tmp/coqui.py
+          python /tmp/coqui.py 2>&1 | tee out/log-coqui.txt
           ls -laR out
       - name: MMS-TTS italiano
         continue-on-error: true
         run: |
           set -euo pipefail
           mkdir -p out/mms-ita
-          optimum-cli export onnx --model facebook/mms-tts-ita --task text-to-audio /tmp/mms
+          optimum-cli export onnx --model facebook/mms-tts-ita --task text-to-audio /tmp/mms 2>&1 | tee out/log-mms-export.txt
           ls -la /tmp/mms
           cat > /tmp/mms.py <<'PY'
           import json, shutil, glob
@@ -85,16 +85,18 @@ jobs:
                     open("out/mms-ita/info.json", "w"), ensure_ascii=False, indent=1)
           print([(i.name, i.shape) for i in sess.get_inputs()], ids)
           PY
-          python /tmp/mms.py
+          python /tmp/mms.py 2>&1 | tee out/log-mms.txt
       - name: Salva nel ramo voci-convertite
+        if: always()
         run: |
           set -e
-          ls -laR out || true
+          mkdir -p out
+          ls -laR out | tee out/log-files.txt || true
           cd out
           git init -q -b voci-convertite
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for f in $(find . -name "*.onnx" -size +90M); do split -b 45000000 -d -a 1 "$f" "$f.part" && rm "$f"; done
           git add -A
-          git commit -q -m "Voci convertite in ONNX ($GITHUB_SHA)"
+          git commit -q -m "Voci convertite in ONNX ($GITHUB_SHA)" || true
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" voci-convertite
