@@ -1,12 +1,13 @@
-// Voce Kokoro dentro il browser: fonemi con eSpeak NG (WebAssembly), audio con il modello Kokoro-82M (onnxruntime-web).
-// Tutto gira sul dispositivo: nessun server, nessun costo.
+// Voci neurali dentro il browser: fonemi con eSpeak NG (WebAssembly), audio con Kokoro-82M o Piper (onnxruntime-web).
+// Tutto gira sul dispositivo: nessun server, nessun costo. Ogni voce si scarica solo quando la scegli.
 import * as ort from './ort/ort.wasm.min.mjs';
 import ESpeakModule from './espeak/espeak-ng.js';
 
 const BASE = new URL('./', import.meta.url);
 const CACHE = 'cerca-voce-kokoro-v1';
-const SR = 24000;
-let session = null, espeak = null, espeakLang = '', vocab = null, ready = null;
+let espeak = null, espeakLang = '', vocab = null, ready = null, threads = 1;
+let kokoro = null, kokoroP = null;
+const piper = new Map();          // id -> Promise<{session, cfg}>
 const styles = new Map();
 let gen = 0, queue = [], running = false;
 
@@ -31,32 +32,61 @@ async function getBytes(path, onChunk){
   return bytes;
 }
 
+// scarica un modello diviso in parti (manifest.json + part0..N), con l'avanzamento
+async function getModel(dir, label){
+  const man = await (await fetch(new URL(dir + '/manifest.json', BASE))).json();
+  let loaded = 0;
+  const prog = n => { loaded += n; post({ type: 'progress', what: label, loaded, total: man.size }); };
+  const parts = [];
+  for (const p of man.parts) parts.push(await getBytes(dir + '/' + p, prog));
+  const model = new Uint8Array(man.size); let o = 0; for (const p of parts){ model.set(p, o); o += p.length; }
+  return model;
+}
+
 async function init(opt){
   const t0 = performance.now();
-  const man = await (await fetch(new URL('model/manifest.json', BASE))).json();
-  let loaded = 0, fromCache = true;
-  const prog = (n, cached) => { loaded += n; if (!cached) fromCache = false; post({ type: 'progress', loaded, total: man.size }); };
-  const espeakP = (async () => {
-    const m = await ESpeakModule({ locateFile: f => new URL('espeak/' + f, BASE).href });
-    espeak = new m.eSpeakNGWorker();
-    espeak.set_voice('it'); espeakLang = 'it';
-  })();
+  const m = await ESpeakModule({ locateFile: f => new URL('espeak/' + f, BASE).href });
+  espeak = new m.eSpeakNGWorker();
+  espeak.set_voice('it'); espeakLang = 'it';
   vocab = await (await fetch(new URL('vocab.json', BASE))).json();
-  const parts = [];
-  for (const p of man.parts) parts.push(await getBytes('model/' + p, prog));
-  const model = new Uint8Array(man.size); let o = 0; for (const p of parts){ model.set(p, o); o += p.length; }
   ort.env.wasm.wasmPaths = new URL('ort/', BASE).href;
-  const threads = self.crossOriginIsolated ? Math.max(1, Math.min(opt.threads || 4, 8)) : 1;
+  threads = self.crossOriginIsolated ? Math.max(1, Math.min(opt.threads || 4, 8)) : 1;
   ort.env.wasm.numThreads = threads;
-  session = await ort.InferenceSession.create(model, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
-  await espeakP;
-  post({ type: 'ready', ms: Math.round(performance.now() - t0), threads, fromCache, isolated: !!self.crossOriginIsolated });
+  post({ type: 'ready', ms: Math.round(performance.now() - t0), threads, isolated: !!self.crossOriginIsolated });
+}
+
+const sessOpt = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+function ensureKokoro(){
+  if (!kokoroP) kokoroP = (async () => {
+    const model = await getModel('model', 'Kokoro');
+    kokoro = await ort.InferenceSession.create(model, sessOpt);
+    post({ type: 'loaded', what: 'Kokoro' });
+    return kokoro;
+  })().catch(e => { kokoroP = null; throw e; });
+  return kokoroP;
+}
+function ensurePiper(id, label){
+  if (!piper.has(id)){
+    // tiene in memoria al massimo due voci Piper oltre a Kokoro
+    if (piper.size >= 2){ const [old] = piper.keys(); piper.get(old).then(v => { try { v.session.release(); } catch (e) {} }).catch(() => {}); piper.delete(old); }
+    const p = (async () => {
+      const dir = 'piper/' + id;
+      const cfg = await (await fetch(new URL(dir + '/config.json', BASE))).json();
+      const model = await getModel(dir, label || id);
+      const session = await ort.InferenceSession.create(model, sessOpt);
+      post({ type: 'loaded', what: label || id });
+      return { session, cfg };
+    })();
+    p.catch(() => piper.delete(id));
+    piper.set(id, p);
+  }
+  return piper.get(id);
 }
 
 async function style(spec){
   const key = JSON.stringify(spec);
   if (styles.has(key)) return styles.get(key);
-  const load = async n => new Float32Array((await getBytes('voices/' + n + '.bin')).buffer);
+  const load = async n => { const b = await getBytes('voices/' + n + '.bin'); return new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4); };
   const a = await load(spec.a);
   let s = a;
   if (spec.b && spec.w > 0){
@@ -80,21 +110,31 @@ function phonemize(segs){
   return out.replace(/\s+/g, ' ').trim();
 }
 
-function tokens(ph){
+async function synthKokoro(ph, sty, speed){
   const ids = [];
   for (const ch of ph){ const id = vocab[ch]; if (id !== undefined) ids.push(id); }
-  return ids.slice(0, 508);
+  if (!ids.length) return new Float32Array(0);
+  const n = Math.min(ids.length, 508), row = n - 1;
+  const st = sty.slice(row * 256, row * 256 + 256);
+  const tok = new ort.Tensor('int64', BigInt64Array.from([0, ...ids.slice(0, n), 0].map(BigInt)), [1, n + 2]);
+  const out = await kokoro.run({ tokens: tok, style: new ort.Tensor('float32', st, [1, 256]), speed: new ort.Tensor('float32', new Float32Array([speed]), [1]) });
+  const a = out.audio || out[Object.keys(out)[0]];
+  return new Float32Array(a.data);
 }
 
-async function synth(ph, sty, speed){
-  const ids = tokens(ph);
-  if (!ids.length) return new Float32Array(0);
-  const row = Math.min(ids.length, 510) - 1;
-  const st = sty.slice(row * 256, row * 256 + 256);
-  const tok = new ort.Tensor('int64', BigInt64Array.from([0, ...ids, 0].map(BigInt)), [1, ids.length + 2]);
-  const feeds = { tokens: tok, style: new ort.Tensor('float32', st, [1, 256]), speed: new ort.Tensor('float32', new Float32Array([speed]), [1]) };
-  const out = await session.run(feeds);
-  const a = out.audio || out[Object.keys(out)[0]];
+async function synthPiper(ph, v, speed){
+  const map = v.cfg.phoneme_id_map, inf = v.cfg.inference || {};
+  const pad = map['_'] || [0], ids = [...(map['^'] || [1]), ...pad];
+  for (const ch of ph.normalize('NFD')){ const id = map[ch]; if (id){ ids.push(...id, ...pad); } }
+  ids.push(...(map['$'] || [2]));
+  if (ids.length <= 3) return new Float32Array(0);
+  const scales = new Float32Array([inf.noise_scale ?? 0.667, (inf.length_scale ?? 1) / speed, inf.noise_w ?? 0.8]);
+  const out = await v.session.run({
+    input: new ort.Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]),
+    input_lengths: new ort.Tensor('int64', BigInt64Array.from([BigInt(ids.length)]), [1]),
+    scales: new ort.Tensor('float32', scales, [3])
+  });
+  const a = out.output || out[Object.keys(out)[0]];
   return new Float32Array(a.data);
 }
 
@@ -104,15 +144,31 @@ async function pump(){
     while (queue.length){
       const job = queue.shift();
       if (job.gen < gen) continue;
-      const sty = await style(job.voice);
+      const v = job.voice || {};
+      let synth, sr;
+      try {
+        if (v.engine === 'piper'){
+          const pv = await ensurePiper(v.id, v.label);
+          sr = (pv.cfg.audio && pv.cfg.audio.sample_rate) || 22050;
+          synth = ph => synthPiper(ph, pv, job.speed);
+        } else {
+          await ensureKokoro();
+          const sty = await style(v);
+          sr = 24000;
+          synth = ph => synthKokoro(ph, sty, job.speed);
+        }
+      } catch (e) {
+        post({ type: 'error', id: job.id, voiceError: true, message: String(e && e.message || e) });
+        continue;
+      }
       for (let k = 0; k < job.clauses.length; k++){
         if (job.gen < gen) break;
         const c = job.clauses[k];
         const t0 = performance.now();
         const ph = phonemize(c.segs) + (c.mark || '');
-        const pcm = c.segs.length ? await synth(ph, sty, job.speed) : new Float32Array(0);
+        const pcm = c.segs.length ? await synth(ph) : new Float32Array(0);
         if (job.gen < gen) break;
-        post({ type: 'audio', id: job.id, k, last: k === job.clauses.length - 1, pcm, pause: c.pause || 0, ph: job.debug ? ph : undefined, ms: Math.round(performance.now() - t0) }, [pcm.buffer]);
+        post({ type: 'audio', id: job.id, k, last: k === job.clauses.length - 1, pcm, sr, pause: c.pause || 0, ph: job.debug ? ph : undefined, ms: Math.round(performance.now() - t0) }, [pcm.buffer]);
       }
     }
   } catch (e) {
@@ -127,6 +183,12 @@ self.onmessage = async e => {
     return;
   }
   if (m.type === 'cancel'){ gen = Math.max(gen, m.gen); queue = queue.filter(j => j.gen >= gen); return; }
+  if (m.type === 'preload'){
+    await ready;
+    try { if (m.voice && m.voice.engine === 'piper') await ensurePiper(m.voice.id, m.voice.label); else { await ensureKokoro(); if (m.voice) await style(m.voice); } }
+    catch (err) { post({ type: 'error', voiceError: true, message: String(err && err.message || err) }); }
+    return;
+  }
   if (m.type === 'speak'){
     if (!ready){ post({ type: 'error', message: 'non inizializzato' }); return; }
     await ready;

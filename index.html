@@ -392,7 +392,7 @@ a{color:var(--accent)}
 @keyframes kpulse{50%{opacity:.35}}
 .kbar{flex-basis:100%;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
 .kbar i{display:block;height:100%;background:var(--accent);transition:width .2s}
-.kvoices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 10px}
+.kvoices{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin:2px 0 10px}
 .kvc{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface);cursor:pointer;color:var(--ink);font:inherit}
 .kvc:hover{border-color:var(--accent-line)}
 .kvc.on{border-color:var(--accent-line);background:var(--accent-soft)}
@@ -425,6 +425,14 @@ a{color:var(--accent)}
 #kbox .vctl .l{width:92px}
 @media (max-width:560px){#kbox .vctl .l{width:78px}}
 #kbox .vctl label.col .l{width:auto}
+.kvc .ktag{color:var(--accent);font-weight:600;font-size:11.5px;margin-top:2px}
+.kvc .kmeta{margin-top:3px;font-size:12px;min-height:1.2em}
+.kvc .ksize{color:var(--muted)}
+.kvc .khave{color:var(--src);font-weight:600}
+.kother{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted);margin:0 0 12px}
+.kother select{font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);max-width:420px}
+#kmixbox[hidden]{display:none}
+@media (max-width:560px){.kvoices{grid-template-columns:1fr 1fr}}
 </style>
 <script>
 (function(){
@@ -495,18 +503,22 @@ a{color:var(--accent)}
         <h2>Impostazioni</h2>
         <section class="sbox2" id="kbox" aria-labelledby="hkvoce">
           <h3 id="hkvoce">Voce</h3>
-          <p class="hint">Chi legge quando premi «Ascolta». La voce Kokoro è una voce neurale che gira direttamente nel tuo browser: niente abbonamenti e niente server, e tutto quello che regoli qui resta salvato su questo dispositivo.</p>
-          <div class="seg2 keng" id="keng" role="group" aria-label="Motore della voce"><button type="button" data-e="kokoro" aria-pressed="true">Voce Kokoro</button><button type="button" data-e="browser" aria-pressed="false">Voci del dispositivo</button></div>
+          <p class="hint">Chi legge quando premi «Ascolta». Sono voci neurali che girano direttamente nel tuo browser, senza abbonamenti e senza server. Le Kokoro sono le più naturali; le Piper sono più leggere e veloci, quindi vanno bene anche su un PC lento o sul telefono. Ogni voce si scarica la prima volta che la usi, e tutto quello che regoli qui resta salvato su questo dispositivo.</p>
+          <div class="seg2 keng" id="keng" role="group" aria-label="Motore della voce"><button type="button" data-e="kokoro" aria-pressed="true">Voci neurali</button><button type="button" data-e="browser" aria-pressed="false">Voci del dispositivo</button></div>
           <div class="kstat" id="kstat" role="status"></div>
           <div id="kopts">
             <p class="vcur" id="kcur"></p>
+            <h4 class="vsub">Voci italiane</h4>
+            <div class="kvoices" id="kbase" role="radiogroup" aria-label="Voce"></div>
+            <label class="kother"><span>Oppure una voce Kokoro straniera che legge in italiano, con il suo accento</span><select id="kother" aria-label="Voce Kokoro straniera"></select></label>
+            <div id="kmixbox">
             <h4 class="vsub">Timbro</h4>
-            <div class="kvoices" id="kbase" role="radiogroup" aria-label="Voce di base"></div>
             <div class="vctl">
               <label><span class="l">Mescola con</span><select id="kmix" aria-label="Seconda voce da mescolare"></select></label>
               <label><span class="l">Quanto</span><input type="range" id="kw" min="0.05" max="0.7" step="0.05"><output id="kwo"></output></label>
             </div>
-            <p class="hint">Mescolare due voci crea un timbro nuovo: Sara con il 35% di Heart, per esempio, è più morbida. Oltre il 50% comincia a sentirsi l'accento straniero.</p>
+            <p class="hint">Solo per le voci Kokoro: mescolare due voci crea un timbro nuovo. Sara con il 35% di Heart, per esempio, è più morbida; oltre il 50% comincia a sentirsi l'accento straniero.</p>
+            </div>
             <h4 class="vsub">Ritmo</h4>
             <div class="vctl">
               <label><span class="l">Velocità</span><input type="range" id="kspeed" min="0.7" max="1.5" step="0.05"><output id="kspeedo"></output></label>
@@ -1636,7 +1648,7 @@ const KDEF = { engine: 'kokoro', voice: 'if_sara', mix: '', w: 0.35, speed: 1, p
 const kset = Object.assign({}, KDEF, store.get('cerca.kokoro', {}));
 if (!Array.isArray(kset.user)) kset.user = [];
 const saveK = () => store.set('cerca.kokoro', kset);
-const KV = { synS: 0, synMs: 0, rtf: 0, w: null, state: 'off', loaded: 0, total: 0, err: '', gen: 0, seq: 0, ctx: null, q: [], jobs: new Map(), src: null, threads: 1, cached: false, waiting: false };
+const KV = { dl: null, have: new Set(), inCache: new Set(), vErr: '', synS: 0, synMs: 0, rtf: 0, w: null, state: 'off', loaded: 0, total: 0, err: '', gen: 0, seq: 0, ctx: null, q: [], jobs: new Map(), src: null, threads: 1, cached: false, waiting: false };
 const useK = () => KOK_OK && kset.engine === 'kokoro' && KV.state !== 'error';
 const KVOICES = [
   ['if_sara', 'Sara', 'italiano · donna'], ['im_nicola', 'Nicola', 'italiano · uomo'],
@@ -1652,8 +1664,35 @@ const KVOICES = [
   ['ef_dora', 'Dora', 'spagnolo · donna'], ['em_alex', 'Alex', 'spagnolo · uomo'], ['ff_siwis', 'Siwis', 'francese · donna'],
   ['pf_dora', 'Dora', 'portoghese · donna'], ['pm_alex', 'Alex', 'portoghese · uomo']
 ];
-const kvName = id => { const v = KVOICES.find(x => x[0] === id); return v ? v[1] : id; };
-const kVoiceSpec = () => ({ a: kset.voice, b: kset.mix || null, w: kset.mix ? Number(kset.w) || 0 : 0 });
+// le voci che leggono in italiano: Kokoro (le più naturali) e Piper (più leggere e veloci)
+const MAINV = [
+  { id: 'if_sara', name: 'Sara', d: 'donna', tag: 'Kokoro · la più naturale', mb: 88 },
+  { id: 'im_nicola', name: 'Nicola', d: 'uomo', tag: 'Kokoro · la più naturale', mb: 88 },
+  { id: 'piper:it_IT-serena-high', name: 'Serena HD', d: 'donna', tag: 'Piper · alta qualità', mb: 109 },
+  { id: 'piper:it_IT-serena-medium', name: 'Serena', d: 'donna', tag: 'Piper · veloce', mb: 61 },
+  { id: 'piper:it_IT-paola-medium', name: 'Paola', d: 'donna', tag: 'Piper · veloce', mb: 60 },
+  { id: 'piper:it_IT-dii-high', name: 'Dii', d: 'donna', tag: 'Piper · alta qualità', mb: 60 },
+  { id: 'piper:it_IT-miro-high', name: 'Miro', d: 'uomo', tag: 'Piper · alta qualità', mb: 60 },
+  { id: 'piper:it_IT-riccardo-x_low', name: 'Riccardo', d: 'uomo', tag: 'Piper · leggerissima', mb: 20 }
+];
+const isPiper = v => String(v || '').startsWith('piper:');
+const kvName = id => { const m = MAINV.find(x => x.id === id); if (m) return m.name; const v = KVOICES.find(x => x[0] === id); return v ? v[1] : id; };
+const kvLabel = id => isPiper(id) ? kvName(id) : 'Kokoro';
+const kvHave = id => KV.have.has(kvLabel(id)) || KV.inCache.has(kvLabel(id));
+// quali voci sono già salvate nel browser (per non dire «si scarica» a chi l'ha già scaricata)
+async function kCheckCache(){
+  try {
+    const c = await caches.open('cerca-voce-kokoro-v1');
+    for (const v of MAINV){
+      const path = isPiper(v.id) ? 'tts/piper/' + v.id.slice(6) + '/model.part0' : 'tts/model/kokoro-int8.part0';
+      if (await c.match(new URL(path, location.href).href)) KV.inCache.add(kvLabel(v.id));
+    }
+  } catch (e) {}
+  kvStatus(); if (!setv.hidden) kRenderVoices();
+}
+const kVoiceSpec = () => isPiper(kset.voice)
+  ? { engine: 'piper', id: kset.voice.slice(6), label: kvName(kset.voice) }
+  : { engine: 'kokoro', a: kset.voice, b: kset.mix || null, w: kset.mix ? Number(kset.w) || 0 : 0 };
 
 /* --- dal testo ai pezzi da pronunciare */
 const LETT = { A: 'a', B: 'bi', C: 'ci', D: 'di', E: 'e', F: 'effe', G: 'gi', H: 'acca', I: 'i', J: 'gei', K: 'cappa', L: 'elle', M: 'emme', N: 'enne', O: 'o', P: 'pi', Q: 'cu', R: 'erre', S: 'esse', T: 'ti', U: 'u', V: 'vi', W: 'vu doppia', X: 'ics', Y: 'ipsilon', Z: 'zeta' };
@@ -1796,16 +1835,24 @@ function kvEnsure(){
 }
 let kvStT = 0;
 function kvMsg(m){
-  if (m.type === 'progress'){ KV.loaded = m.loaded; KV.total = m.total; const t = Date.now(); if (t - kvStT > 150){ kvStT = t; kvStatus(); } return; }
-  if (m.type === 'ready'){ KV.state = 'ready'; KV.threads = m.threads || 1; KV.cached = !!m.fromCache; kvStatus(); return; }
+  if (m.type === 'progress'){ KV.dl = { what: m.what, loaded: m.loaded, total: m.total }; const t = Date.now(); if (t - kvStT > 150){ kvStT = t; kvStatus(); } return; }
+  if (m.type === 'ready'){ KV.state = 'ready'; KV.threads = m.threads || 1; kvStatus(); return; }
+  if (m.type === 'loaded'){ KV.dl = null; KV.vErr = ''; KV.have.add(m.what); kvStatus(); if (typeof kRenderVoices === 'function' && !setv.hidden) kRenderVoices(); return; }
   if (m.type === 'audio'){
     const job = KV.jobs.get(m.id); if (!job || job.gen !== KV.gen) return;
-    job.chunks[m.k] = { pcm: m.pcm, pause: m.pause }; job.got = (job.got || 0) + 1;
-    if (m.pcm.length > KSR * 0.3){ KV.synS += m.pcm.length / KSR; KV.synMs += m.ms || 0; if (KV.synS > 40){ KV.synS /= 2; KV.synMs /= 2; } KV.rtf = KV.synMs / 1000 / KV.synS; }
+    const sr = m.sr || KSR;
+    job.chunks[m.k] = { pcm: m.pcm, pause: m.pause, sr }; job.got = (job.got || 0) + 1;
+    if (m.pcm.length > sr * 0.3){ KV.synS += m.pcm.length / sr; KV.synMs += m.ms || 0; if (KV.synS > 40){ KV.synS /= 2; KV.synMs /= 2; } KV.rtf = KV.synMs / 1000 / KV.synS; }
     kvPlay(); if (KV.synS > 3) kvStatus(); return;
   }
   if (m.type === 'error'){
     if (m.fatal){ kvFatal(m.message); return; }
+    if (m.voiceError){
+      KV.dl = null; KV.vErr = String(m.message || 'errore');
+      kvCancel(); rdStop();
+      document.querySelectorAll('.kplay.on,#ktest.on').forEach(b => { b.classList.remove('on'); b.textContent = b.id === 'ktest' ? '▶ Prova' : '▶'; });
+      kvStatus(); return;
+    }
     const job = KV.q[0];
     if (job){ KV.q.shift(); KV.jobs.delete(job.id); if (job.u.onerror) job.u.onerror({ error: 'synthesis-failed' }); kvPlay(); }
   }
@@ -1818,14 +1865,21 @@ function kvFatal(msg){
   kvStatus();
   q.forEach(j => { try { j.u.onerror && j.u.onerror({ error: 'synthesis-failed' }); } catch (e) {} });
 }
-function kTrim(pcm){
-  let a = 0, b = pcm.length - 1, mx = 0;
-  while (a < b && Math.abs(pcm[a]) < 0.012) a++;
-  while (b > a && Math.abs(pcm[b]) < 0.012) b--;
-  a = Math.max(0, a - Math.round(KSR * 0.03)); b = Math.min(pcm.length, b + Math.round(KSR * 0.07));
+// toglie il silenzio ai bordi e porta tutte le voci allo stesso volume
+function kTrim(pcm, sr){
+  let mx = 0;
+  for (let i = 0; i < pcm.length; i++){ const v = Math.abs(pcm[i]); if (v > mx) mx = v; }
+  const th = Math.max(0.004, mx * 0.04);
+  let a = 0, b = pcm.length - 1;
+  while (a < b && Math.abs(pcm[a]) < th) a++;
+  while (b > a && Math.abs(pcm[b]) < th) b--;
+  a = Math.max(0, a - Math.round(sr * 0.03)); b = Math.min(pcm.length, b + Math.round(sr * 0.07));
   const out = pcm.slice(a, b);
-  for (let i = 0; i < out.length; i++){ const v = Math.abs(out[i]); if (v > mx) mx = v; }
-  if (mx > 0.97){ const g = 0.97 / mx; for (let i = 0; i < out.length; i++) out[i] *= g; }
+  let ss = 0; for (let i = 0; i < out.length; i++) ss += out[i] * out[i];
+  const rms = Math.sqrt(ss / Math.max(1, out.length));
+  let g = rms > 1e-4 ? Math.min(4, Math.max(0.5, 0.09 / rms)) : 1;
+  if (mx * g > 0.95) g = 0.95 / mx;
+  if (Math.abs(g - 1) > 0.02) for (let i = 0; i < out.length; i++) out[i] *= g;
   return out;
 }
 function kvSpeak(u){
@@ -1860,9 +1914,10 @@ function kvPlay(){
   const ctx = kvCtx(); if (!ctx){ kvFatal('audio non disponibile'); return; }
   if (!job.started){ job.started = true; if (job.u.onstart) job.u.onstart(); if (job.gen !== KV.gen) return; }
   const p = Number(kset.pitch) || 1;
-  const pcm = c.pcm.length ? kTrim(c.pcm) : new Float32Array(0);
-  const pad = Math.round(KSR * (c.pause || 0) * p);
-  const buf = ctx.createBuffer(1, Math.max(1, pcm.length + pad), KSR);
+  const sr = c.sr || KSR;
+  const pcm = c.pcm.length ? kTrim(c.pcm, sr) : new Float32Array(0);
+  const pad = Math.round(sr * (c.pause || 0) * p);
+  const buf = ctx.createBuffer(1, Math.max(1, pcm.length + pad), sr);
   buf.getChannelData(0).set(pcm);
   const src = ctx.createBufferSource(); src.buffer = buf; src.playbackRate.value = p; src.connect(ctx.destination);
   const gen = KV.gen; KV.src = src;
@@ -1882,29 +1937,37 @@ function kvWait(on){
 }
 const MB = n => Math.round(n / 1048576);
 function kvStatusText(){
-  if (!KOK_OK) return 'Questo browser non può usare la voce Kokoro: uso le voci del dispositivo.';
-  if (KV.state === 'error') return 'Non sono riuscito ad avviare la voce Kokoro qui (' + KV.err + '). Per ora leggo con le voci del dispositivo.';
-  if (KV.state === 'loading') return KV.total && KV.loaded < KV.total ? `Scarico la voce: ${MB(KV.loaded)} MB di ${MB(KV.total)} (solo la prima volta)` : 'Preparo la voce…';
-  if (KV.state === 'ready'){
-    let t = 'Voce pronta' + (KV.threads > 1 ? ` · usa ${KV.threads} processori` : '');
+  if (!KOK_OK) return 'Questo browser non può usare le voci neurali: uso le voci del dispositivo.';
+  if (KV.state === 'error') return 'Non sono riuscito ad avviare le voci neurali qui (' + KV.err + '). Per ora leggo con le voci del dispositivo.';
+  if (KV.dl) return KV.dl.total && KV.dl.loaded < KV.dl.total ? `Scarico la voce ${KV.dl.what === 'Kokoro' ? 'Kokoro' : KV.dl.what}: ${MB(KV.dl.loaded)} MB di ${MB(KV.dl.total)} (solo la prima volta)` : 'Preparo la voce…';
+  if (KV.vErr) return 'Non sono riuscito a scaricare questa voce (' + KV.vErr + '). Riprova o scegline un\'altra.';
+  if (KV.state === 'loading') return 'Preparo la voce…';
+  if (!kvHave(kset.voice)){
+    const m = MAINV.find(x => x.id === kset.voice);
+    return `La voce ${kvName(kset.voice)} si scarica la prima volta che premi Ascolta o Prova (circa ${m ? m.mb : 88} MB), poi resta salvata.`;
+  }
+  if (KV.state === 'ready' || KV.state === 'off'){
+    let t = (KV.have.has(kvLabel(kset.voice)) ? 'Voce pronta' : 'Voce già scaricata') + (KV.threads > 1 ? ` · usa ${KV.threads} processori` : '');
     if (KV.synS > 3) t += KV.rtf <= 0.85 ? ' · genera l\'audio più in fretta del parlato' : KV.rtf <= 1.05 ? ' · genera l\'audio alla stessa velocità del parlato' : ' · su questo dispositivo genera l\'audio più lentamente del parlato, quindi tra una frase e l\'altra sentirai qualche pausa in più';
     return t;
   }
-  return 'La voce si scarica la prima volta che premi Ascolta o Prova (circa 90 MB), poi resta salvata in questo browser.';
+  const m = MAINV.find(x => x.id === kset.voice);
+  return `Ogni voce si scarica la prima volta che la usi: ${kvName(kset.voice)} pesa circa ${m ? m.mb : 88} MB, poi resta salvata in questo browser.`;
 }
 function kvStatus(){
   const el = document.getElementById('kstat');
   if (el){
-    const pct = KV.state === 'loading' && KV.total ? Math.min(100, Math.round(KV.loaded / KV.total * 100)) : KV.state === 'ready' ? 100 : 0;
-    el.className = 'kstat ' + KV.state;
+    const pct = KV.dl && KV.dl.total ? Math.min(100, Math.round(KV.dl.loaded / KV.dl.total * 100)) : 0;
+    const have = kvHave(kset.voice);
+    el.className = 'kstat ' + (KV.dl || KV.state === 'loading' ? 'loading' : KV.vErr ? 'error' : KV.state === 'ready' && have ? 'ready' : KV.state === 'error' ? 'error' : 'off');
     el.innerHTML = `<span class="kdot"></span><span class="ktxt">${esc(kvStatusText())}</span>` +
-      (KV.state === 'loading' ? `<span class="kbar"><i style="width:${pct}%"></i></span>` : '') +
-      (KV.state === 'off' && KOK_OK ? '<button type="button" class="btn" id="kdl">Scaricala ora</button>' : '');
+      (KV.dl ? `<span class="kbar"><i style="width:${pct}%"></i></span>` : '') +
+      (!KV.dl && !have && KOK_OK && KV.state !== 'error' && useK() ? '<button type="button" class="btn" id="kdl">Scaricala ora</button>' : '');
   }
   const pw = document.getElementById('plwait');
   if (pw){
     let t = '';
-    if (useK() && KV.waiting) t = KV.state === 'loading' ? kvStatusText() : 'Preparo l\'audio…';
+    if (useK() && KV.waiting) t = KV.dl || KV.state === 'loading' ? kvStatusText() : 'Preparo l\'audio…';
     pw.textContent = t; pw.hidden = !t;
   }
 }
@@ -1934,10 +1997,22 @@ function kPreview(text, btn, raw){
 }
 function kRenderVoices(){
   const base = document.getElementById('kbase'); if (!base) return;
-  base.innerHTML = ['if_sara', 'im_nicola'].map(id => {
-    const v = KVOICES.find(x => x[0] === id), on = kset.voice === id;
-    return `<button type="button" class="kvc${on ? ' on' : ''}" data-v="${id}" role="radio" aria-checked="${on}"><b>${v[1]}</b><small>${v[2]}</small><span class="vcheck">${on ? '✓ Scelta' : ''}</span></button>`;
+  base.innerHTML = MAINV.map(v => {
+    const on = kset.voice === v.id, have = kvHave(v.id);
+    return `<button type="button" class="kvc${on ? ' on' : ''}" data-v="${v.id}" role="radio" aria-checked="${on}"><b>${esc(v.name)}</b><small>italiano · ${v.d}</small><small class="ktag">${esc(v.tag)}</small><span class="kmeta">${on ? '<span class="vcheck">✓ Scelta</span>' : have ? '<span class="khave">scaricata</span>' : `<span class="ksize">${v.mb} MB</span>`}</span></button>`;
   }).join('');
+  const oth = document.getElementById('kother');
+  if (oth && !oth.dataset.ok){
+    let h = '<option value="">Scegli…</option>', grp = '';
+    for (const [id, n, d] of KVOICES.slice(2)){
+      const g = d.split(' · ')[0];
+      if (g !== grp){ if (grp) h += '</optgroup>'; h += `<optgroup label="${esc(g.charAt(0).toUpperCase() + g.slice(1))}">`; grp = g; }
+      h += `<option value="${id}">${esc(n)} (${esc(d.split(' · ')[1] || '')})</option>`;
+    }
+    oth.innerHTML = h + '</optgroup>'; oth.dataset.ok = '1';
+  }
+  if (oth) oth.value = KVOICES.slice(2).some(x => x[0] === kset.voice) ? kset.voice : '';
+  document.getElementById('kmixbox').hidden = isPiper(kset.voice);
   const mix = document.getElementById('kmix');
   if (mix && !mix.dataset.ok){
     let h = '<option value="">Nessuna (voce pura)</option>', grp = '';
@@ -1952,7 +2027,7 @@ function kRenderVoices(){
   const w = document.getElementById('kw');
   w.value = kset.w; w.disabled = !kset.mix;
   document.getElementById('kwo').textContent = kset.mix ? Math.round(kset.w * 100) + '%' : '—';
-  document.getElementById('kcur').textContent = 'Voce in uso: ' + kvName(kset.voice) + (kset.mix ? ` + ${Math.round(kset.w * 100)}% di ${kvName(kset.mix)}` : '');
+  document.getElementById('kcur').textContent = 'Voce in uso: ' + kvName(kset.voice) + (isPiper(kset.voice) ? ' (Piper)' : (kset.mix ? ` + ${Math.round(kset.w * 100)}% di ${kvName(kset.mix)}` : '') + ' (Kokoro)');
   const sl = [['kspeed', 'speed', v => fmtRate(v)], ['kpitch', 'pitch', v => String(Math.round(v * 100) / 100).replace('.', ',')],
     ['kpc', 'pComma', v => String(v.toFixed(2)).replace('.', ',') + ' s'], ['kpk', 'pColon', v => String(v.toFixed(2)).replace('.', ',') + ' s'], ['kps', 'pStop', v => String(v.toFixed(2)).replace('.', ',') + ' s']];
   for (const [id, key, f] of sl){ const el = document.getElementById(id); el.value = kset[key]; document.getElementById(id + 'o').textContent = f(Number(kset[key])); }
@@ -1987,14 +2062,19 @@ function kSetUser(k, v){
   if (v && !(defs.has(k) && defs.get(k) === v)) kset.user.unshift({ k, v });
   KDICT = null; saveK();
 }
-function kRender(){ kvStatus(); kRenderVoices(); kRenderDict(); }
+function kRender(){ kvStatus(); kRenderVoices(); kRenderDict(); kCheckCache(); }
+function kSetVoice(id){
+  if (kset.voice !== id){ KV.synS = 0; KV.synMs = 0; KV.rtf = 0; }
+  kset.voice = id; KV.vErr = ''; saveK(); kRenderVoices(); kvStatus();
+  kPreview(document.getElementById('ksample').value.trim() || KSAMPLE, document.getElementById('ktest'));
+}
 function kWire(){
   const box = document.getElementById('kbox'); if (!box) return;
   if (!document.getElementById('ksample').value) document.getElementById('ksample').value = KSAMPLE;
   box.addEventListener('click', e => {
     const t = e.target;
-    if (t.id === 'kdl'){ kvEnsure(); return; }
-    const vc = t.closest('.kvc'); if (vc){ kset.voice = vc.dataset.v; saveK(); kRenderVoices(); kPreview(document.getElementById('ksample').value.trim() || KSAMPLE, document.getElementById('ktest')); return; }
+    if (t.id === 'kdl'){ kvEnsure(); if (KV.w) KV.w.postMessage({ type: 'preload', voice: kVoiceSpec() }); KV.vErr = ''; kvStatus(); return; }
+    const vc = t.closest('.kvc'); if (vc){ kSetVoice(vc.dataset.v); return; }
     const eb = t.closest('#keng button'); if (eb){ kset.engine = eb.dataset.e; saveK(); vxCancel(); kRenderVoices(); if (typeof updPlayer === 'function') updPlayer(); return; }
     if (t.id === 'ktest'){ kPreview(document.getElementById('ksample').value.trim() || KSAMPLE, t); return; }
     if (t.id === 'kreset'){ Object.assign(kset, { speed: 1, pitch: 1, pComma: KDEF.pComma, pColon: KDEF.pColon, pStop: KDEF.pStop }); saveK(); kRenderVoices(); return; }
@@ -2015,6 +2095,7 @@ function kWire(){
     const t = e.target;
     if (t.classList.contains('kv')){ const row = t.closest('.krow'); kSetUser(row.dataset.k, t.value); kRenderDict(); return; }
     if (t.id === 'kmix'){ kset.mix = t.value; saveK(); kRenderVoices(); if (kset.mix) kPreview(document.getElementById('ksample').value.trim() || KSAMPLE, document.getElementById('ktest')); return; }
+    if (t.id === 'kother' && t.value){ kSetVoice(t.value); return; }
   });
   box.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('kv')){ e.preventDefault(); e.target.blur(); } if (e.key === 'Enter' && (e.target.id === 'kak' || e.target.id === 'kav')){ e.preventDefault(); document.getElementById('kadd').click(); } });
   const sliders = { kspeed: 'speed', kpitch: 'pitch', kpc: 'pComma', kpk: 'pColon', kps: 'pStop', kw: 'w' };
