@@ -1,0 +1,57 @@
+# Prova su CPU le voci «grandi» open source in italiano (Qwen3-TTS, Chatterbox, XTTS-v2, F5-TTS),
+# clonando tre voci di riferimento. I risultati (mp3 e tempi) vanno nel ramo «prove-voci».
+name: Prova voci grandi
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/prova-voci-grandi.yml', 'tools/prova_voci.py']
+permissions:
+  contents: write
+jobs:
+  prova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        modello: [qwen, chatterbox, xtts, f5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Installa
+        run: |
+          sudo apt-get install -y -qq ffmpeg sox libsox-dev > /dev/null
+          pip install --quiet torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          case "${{ matrix.modello }}" in
+            qwen) pip install --quiet -U qwen-tts soundfile --extra-index-url https://download.pytorch.org/whl/cpu ;;
+            chatterbox) pip install --quiet chatterbox-tts soundfile --extra-index-url https://download.pytorch.org/whl/cpu ;;
+            xtts) pip install --quiet coqui-tts soundfile --extra-index-url https://download.pytorch.org/whl/cpu ;;
+            f5) pip install --quiet f5-tts soundfile --extra-index-url https://download.pytorch.org/whl/cpu ;;
+          esac
+          pip list 2>/dev/null | grep -i -E "^(torch|qwen|chatterbox|coqui|f5|transformers) " || true
+      - name: Genera
+        run: |
+          mkdir -p out/${{ matrix.modello }}
+          set -o pipefail
+          python tools/prova_voci.py ${{ matrix.modello }} out/${{ matrix.modello }} 2>&1 | tee out/${{ matrix.modello }}/log.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.modello }}
+          path: out/${{ matrix.modello }}
+  salva:
+    needs: prova
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: out }
+      - run: |
+          cd out && ls -laR
+          git init -q -b prove-voci
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -q -m "Prove delle voci grandi ($GITHUB_SHA)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" prove-voci
