@@ -1,6 +1,5 @@
 # Converte in ONNX altre voci italiane open source, per farle girare nel browser:
 #  - Coqui VITS «mai_female» (Lisa Caputo) e «mai_male» (Riccardo Fasa), dataset M-AILABS
-#  - Meta MMS-TTS italiano (facebook/mms-tts-ita, licenza CC BY-NC 4.0)
 # Il risultato va nel ramo «voci-convertite»: da lì si scelgono le versioni da pubblicare.
 name: Converti voci open source
 on:
@@ -20,7 +19,7 @@ jobs:
         run: |
           mkdir -p out
           pip install --quiet torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cpu
-          pip install --quiet "coqui-tts<0.27" "transformers==4.46.3" "optimum[exporters]==1.23.3" onnx onnxscript onnxruntime soundfile "torch==2.5.1" "torchaudio==2.5.1" --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet "coqui-tts<0.27" "transformers==4.46.3" "optimum[exporters]==1.23.3" onnx onnxscript onnxruntime soundfile click typer "torch==2.5.1" "torchaudio==2.5.1" --extra-index-url https://download.pytorch.org/whl/cpu
           pip list 2>/dev/null | grep -i -E "^(torch|coqui|transformers|onnx|onnxruntime|optimum)" | tee out/log-pip.txt || true
       - name: Coqui VITS italiano
         continue-on-error: true
@@ -58,34 +57,6 @@ jobs:
           PY
           python /tmp/coqui.py 2>&1 | tee out/log-coqui.txt
           ls -laR out
-      - name: MMS-TTS italiano
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          mkdir -p out/mms-ita
-          optimum-cli export onnx --model facebook/mms-tts-ita --task text-to-audio /tmp/mms 2>&1 | tee out/log-mms-export.txt
-          ls -la /tmp/mms
-          cat > /tmp/mms.py <<'PY'
-          import json, shutil, glob
-          from onnxruntime.quantization import quantize_dynamic, QuantType
-          import onnxruntime as ort
-          from transformers import AutoTokenizer
-          src = glob.glob("/tmp/mms/*.onnx")[0]
-          shutil.copy(src, "out/mms-ita/fp32.onnx")
-          quantize_dynamic("out/mms-ita/fp32.onnx", "out/mms-ita/int8.onnx", weight_type=QuantType.QUInt8)
-          tok = AutoTokenizer.from_pretrained("facebook/mms-tts-ita")
-          test = "ciao, come stai? il job entra nello spool."
-          ids = tok(test).input_ids
-          sess = ort.InferenceSession("out/mms-ita/fp32.onnx")
-          vocab = tok.get_vocab()
-          for f in ("config.json", "tokenizer_config.json", "vocab.json", "special_tokens_map.json"):
-              for p in glob.glob("/tmp/mms/" + f): shutil.copy(p, "out/mms-ita/orig_" + f)
-          json.dump({"test": {"text": test, "ids": ids}, "vocab": vocab, "inputs": [i.name for i in sess.get_inputs()], "outputs": [o.name for o in sess.get_outputs()],
-                     "add_blank": getattr(tok, "add_blank", None), "pad_token_id": tok.pad_token_id, "normalize": getattr(tok, "normalize", None)},
-                    open("out/mms-ita/info.json", "w"), ensure_ascii=False, indent=1)
-          print([(i.name, i.shape) for i in sess.get_inputs()], ids)
-          PY
-          python /tmp/mms.py 2>&1 | tee out/log-mms.txt
       - name: Salva nel ramo voci-convertite
         if: always()
         run: |
